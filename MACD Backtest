@@ -1,0 +1,96 @@
+### Purpose of this code is to backtest MACD strategy using 12,26,9. This is a long only strategy
+## Below is to import the relevant code and set pandas option
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import pandas_datareader.data as web
+import datetime as dt
+%matplotlib inline
+plt.style = 'ggplot'
+pd.set_option('display.max_rows', None)
+
+## Identifying which ticker, start date, end date, defining MACD calcs and appending them into dataframe
+stock = "FRO" #Input stock ticker
+Start_date = '2019-1-1' #Input Start date for analysis
+End_date = dt.datetime.today()
+Quick_EMA = 12 #Amend as you like
+Slow_EMA = 26 #Amend as you like
+Signal_EMA = 9 #Amend as you like
+df = web.DataReader(stock,'yahoo',Start_date,End_date)
+df['12EMA'] = df['Close'].ewm(span = Quick_EMA, min_periods = Quick_EMA).mean()
+df['26EMA'] = df['Close'].ewm(span = Slow_EMA, min_periods = Slow_EMA).mean()
+df['MACDLine'] = df['12EMA'] - df['26EMA']
+df['Signal_Line'] = df['MACDLine'].ewm(span = Signal_EMA, min_periods = Signal_EMA).mean()
+df['MACD_Sig_diff'] = df['MACDLine'] - df['Signal_Line']
+df['MACD_Sig_diff_10MA'] = df['MACD_Sig_diff'].ewm(span = 10, min_periods = 10).mean()
+#df['MACD_Sig_diff'].std()
+#df['MACD_Sig_diff'].mean()
+df['Date'] = df.index
+df
+
+##setting rules for backtest, main strategy - MACD Line crossover signal to buy/sell and risk tolerance on 1% bss Adj CLose
+pos = 0
+realized_pnl = []
+buytrades = []
+selltrades = []
+percentchange = []
+cut_loss_percent = 0.96 #Stop loss level, if its 5% it will be 100% - 5% = 0.95
+for i in df.index:
+    closing_price = df['Close'][i]
+    emin = df['MACDLine'][i]
+    emax = df['Signal_Line'][i]
+    openprice = df['Open'][i]
+    tradedate = df['Date'][i]
+    if (emin>emax):
+        print('MACD higher than Signal')
+        if pos == 0:
+            bp = closing_price        
+            pos = 1
+            buytrades.append(1)
+            cut_loss = cut_loss_percent*bp
+            print('Buying now at ' + str(bp) +' at ' + str(tradedate))
+            print('Will cut loss at ' + str (cut_loss))
+           
+
+   
+    elif (closing_price<cut_loss):
+            if pos == 1:
+               print('Cut Loss at ' + str(cut_loss)+' at ' + str(tradedate))
+               pos = 0
+               selltrades.append(1)
+               print('Pnl is ' + str(cut_loss - bp))
+               pc = (cut_loss - bp)
+               realized_pnl.append(pc)
+               return_onper = pc/bp
+               percentchange.append(return_onper)
+
+    elif (emax>emin):
+        print('MACD is lower than Signal')
+        if pos == 1:
+            cp = closing_price
+            pos = 0
+            selltrades.append(1)
+            print('Selling now at ' + str(cp)+' at ' + str(tradedate))
+            print('Pnl is '+ str(cp-bp))
+            pc = (cp - bp)
+            realized_pnl.append(pc)
+            return_onper = pc/bp
+            percentchange.append(return_onper)            
+            
+            
+if pos == 1:
+    print('Still has position in place')
+    mtm = (closing_price - bp)
+    mtmgainloss = mtm/bp
+    percentchange.append(mtmgainloss)
+
+
+
+
+
+print('Realized Pnl '+ str(sum(realized_pnl)))
+All_pnl = realized_pnl + mtm
+print('Sum of total Pnl ' + str(sum(All_pnl)))
+print('Pnl in % ' +str(sum(percentchange*100)))
+print('The number of buy trades are ' + str(sum(buytrades)))
+print('The number of sell trades are '+ str(sum(selltrades)))
