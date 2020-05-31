@@ -28,7 +28,7 @@ df['MACD_Sig_diff_10MA'] = df['MACD_Sig_diff'].ewm(span = 10, min_periods = 10).
 df['Date'] = df.index
 df
 
-##setting rules for backtest, main strategy - MACD Line crossover signal to buy/sell and risk tolerance on 1% bss Adj CLose
+##setting rules for backtest, main strategy - MACD Line crossover signal to buy/sell and risk tolerance on 4% bss Adj CLose
 pos = 0
 realized_pnl = []
 buytrades = []
